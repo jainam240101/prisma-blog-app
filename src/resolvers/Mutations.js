@@ -1,111 +1,149 @@
 /** @format */
 import { v4 as uuidv4 } from "uuid";
 export const Mutation = {
-  createUser(parent, args, { db }, info) {
-    const takenemail = db.Users.some((user) => {
-      return user.email === args.data.email;
-    });
-    if (takenemail) {
-      throw new Error("Email Already Taken");
+  async createUser(parent, args, { prisma }, info) {
+    const emailtaken = await prisma.exists.User({ email: args.data.email });
+    if (emailtaken) {
+      throw new Error("Email Is Taken");
     }
-    const User = {
-      id: uuidv4(),
-      ...args.data,
-    };
-    db.Users.push(User);
-    return User;
+    return prisma.mutation.createUser({ data: args.data }, info);
   },
-  createPost(parent, args, { db,pubsub }, info) {
-    const userexists = db.Users.some((user) => {
-      return Number(user.id) === Number(args.data.author);
-    });
-    if (userexists) {
-      const data = {
-        id: uuidv4(),
-        ...args.data,
-      };
-      db.PostsDatabase.push(data);
-      pubsub.publish(`allposts`, {
-        post:data
-      });
-      return data;
-    } else {
+  async createPost(parent, { data, author }, { prisma }, info) {
+    const userexists = await prisma.exists.User({ id: author });
+    if (!userexists) {
+      throw new Error("User Doesnt Exists");
+    }
+    const refactoreddata = {
+      ...data,
+      author: {
+        connect: {
+          id: author,
+        },
+      },
+    };
+    return prisma.mutation.createPost(
+      {
+        data: refactoreddata,
+      },
+      info
+    );
+  },
+  async createComment(parent, args, { prisma }, info) {
+    const userexists = await prisma.exists.User({ id: args.data.author });
+    const postexists = await prisma.exists.Post({ id: args.data.post });
+    if (!userexists || !postexists) {
+      throw new Error("Given Information is Incorrect");
+    }
+    return prisma.mutation.createComment(
+      {
+        data: {
+          text: args.data.text,
+          author: {
+            connect: {
+              id: args.data.author,
+            },
+          },
+          post: {
+            connect: {
+              id: args.data.post,
+            },
+          },
+        },
+      },
+      info
+    );
+  },
+  async updateComment(parent, { id, text }, { prisma }, info) {
+    const commentexists = await prisma.exists.Comment({ id: id });
+    if (!commentexists) {
+      throw new Error("Comment Deosnt Exist");
+    }
+    return prisma.mutation.updateComment(
+      {
+        data: {
+          text: text,
+        },
+        where: {
+          id: id,
+        },
+      },
+      info
+    );
+  },
+  async deleteComment(parent, { id }, { prisma }, info) {
+    const commentexists = await prisma.exists.Comment({ id: id });
+    if (!commentexists) {
+      throw new Error("Comment Deosnt Exist");
+    }
+    return prisma.mutation.deleteComment(
+      {
+        where: {
+          id:id
+        },
+      },
+      info
+    );
+  },
+  async deleteUser(parent, { id }, { prisma }, info) {
+    const idexists = await prisma.exists.User({ id: id });
+    if (!idexists) {
+      throw new Error("User Does Not Exists");
+    }
+    return prisma.mutation.deleteUser(
+      {
+        where: {
+          id: id,
+        },
+      },
+      info
+    );
+  },
+  async updateUser(parents, { id, data }, { db, prisma }, info) {
+    const userexists = await prisma.exists.User({ id: id });
+    const emailtaken = await prisma.exists.User({ email: args.data.email });
+    if (emailtaken) {
+      throw new Error("Email Is Taken");
+    }
+    if (!userexists) {
       throw new Error("User Doesnt Exist");
     }
-  },
-  createComment(parent, args, { db,pubsub }, info) {
-    const userexists = db.Users.some((user) => {
-      return Number(user.id) === Number(args.data.author);
-    });
-    const postexist = db.PostsDatabase.some((post) => {
-      return Number(post.id) === Number(args.data.post);
-    });
-    if (userexists && postexist) {
-      const data = {
-        id: uuidv4(),
-        ...args.data,
-      };
-      db.CommentsDatabase.push(data);
-      pubsub.publish(`comment ${args.data.post}`, {
-        comment:data
-      })
-
-      return data;
-    } else {
-      throw new Error("User or Post Id is incorrect");
-    }
-  },
-  deleteUser(parent, args, { db }, info) {
-    const userIndex = db.Users.findIndex((user) => {
-      return user.id === args.id;
-    });
-    if (userIndex === -1) {
-      throw new Error("No User Found");
-    }
-    const deletedUsers = db.Users.splice(userIndex, 1);
-
-    posts = db.PostsDatabase.filter((post) => {
-      const match = post.author === args.id;
-
-      if (match) {
-        comments = db.CommentsDatabase.filter(
-          (comment) => comment.post !== post.id
-        );
-      }
-      return !match;
-    });
-    comments = db.CommentsDatabase.filter(
-      (comment) => comment.author !== args.id
+    return prisma.mutation.updateUser(
+      {
+        data: { ...data },
+        where: { id: id },
+      },
+      info
     );
-    return deletedUsers[0];
   },
-  updateUser(parents, { id, data }, { db }, info) {
-    const User = db.Users.find((user) => {
-      return Number(user.id) === Number(id);
-    });
-    if (!User) {
-      throw new Error("User doesnt exist");
+  async deletePost(parent, { id }, { prisma }, info) {
+    const postsExists = await prisma.exists.Post({ id: id });
+    if (!postsExists) {
+      throw new Error("Post Doesnt Exist");
     }
-    if (typeof data.email === "string") {
-      const emailtaken = db.Users.some((user) => user.email === data.email);
-      if (emailtaken) {
-        throw new Error("Email Taken");
-      }
-      User.email = data.email;
-    }
-    User.name = data.name;
-    User.age = data.age;
-    return User;
+    return prisma.mutation.deletePost(
+      {
+        where: {
+          id: id,
+        },
+      },
+      info
+    );
   },
-  updatePost(parent, { id, data }, { db }, info) {
-    console.log(data);
-    const Post = db.PostsDatabase.find((post) => {
-      return Number(post.id) === Number(id);
-    });
-    console.log(Post)
-    Post.title = data.title;
-    Post.body = data.body;
-    Post.published = data.published;
-    return Post;
+  async updatePost(parent, { id, data }, { db, prisma }, info) {
+    const postexists = await prisma.exists.Post({ id: id });
+    if (!postexists) {
+      throw new Error("Post Doesnt Exist ");
+    }
+    return prisma.mutation.updatePost(
+      {
+        data: {
+          ...data,
+        },
+        where: {
+          id: id,
+        },
+      },
+      info
+    );
   },
 };
