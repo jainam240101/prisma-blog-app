@@ -17,7 +17,7 @@ type Post{
   author: User! @relation(name:"PostToUser",onDelete:SET_NULL)
   comments:[Comment!]! @relation(name:"CommentToPost",onDelete:CASCADE)
   createdAt:DateTime! @createdAt
-  updatedAt:DateTime! @updatedAt
+  updatedAt:DateTime! @updatedA t
 }
 
 type Comment{
