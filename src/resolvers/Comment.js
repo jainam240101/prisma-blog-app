@@ -1,3 +1,4 @@
 /** @format */
 
-export const Comment = {};
+export const Comment = {
+};

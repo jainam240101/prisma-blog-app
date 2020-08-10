@@ -1,3 +1,5 @@
 /** @format */
 
-export const Post = {};
+export const Post = {
+    
+};
